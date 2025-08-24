@@ -1,51 +1,200 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
+"use client"
+
+import { useState, useEffect } from "react"
+import { invoke } from "@tauri-apps/api/core"
+import "./App.css"
+
+interface RecordingState {
+  isRecording: boolean
+  isPaused: boolean
+  duration: number
+  sessionId: string | null
+}
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+  const [recordingState, setRecordingState] = useState<RecordingState>({
+    isRecording: false,
+    isPaused: false,
+    duration: 0,
+    sessionId: null,
+  })
+  const [error, setError] = useState<string | null>(null)
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
+  // Timer for recording duration
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null
+
+    if (recordingState.isRecording && !recordingState.isPaused) {
+      interval = setInterval(() => {
+        setRecordingState((prev) => ({
+          ...prev,
+          duration: prev.duration + 1,
+        }))
+      }, 1000)
+    }
+
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [recordingState.isRecording, recordingState.isPaused])
+
+  const formatDuration = (seconds: number): string => {
+    const hours = Math.floor(seconds / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+    const secs = seconds % 60
+    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
+  }
+
+  const handleStartRecording = async () => {
+    try {
+      setError(null)
+      const sessionId = await invoke<string>("start_recording")
+      setRecordingState({
+        isRecording: true,
+        isPaused: false,
+        duration: 0,
+        sessionId,
+      })
+    } catch (err) {
+      setError(`Failed to start recording: ${err}`)
+      console.error("Start recording error:", err)
+    }
+  }
+
+  const handlePauseRecording = async () => {
+    try {
+      setError(null)
+      await invoke("pause_recording", { sessionId: recordingState.sessionId })
+      setRecordingState((prev) => ({
+        ...prev,
+        isPaused: true,
+      }))
+    } catch (err) {
+      setError(`Failed to pause recording: ${err}`)
+      console.error("Pause recording error:", err)
+    }
+  }
+
+  const handleResumeRecording = async () => {
+    try {
+      setError(null)
+      await invoke("resume_recording", { sessionId: recordingState.sessionId })
+      setRecordingState((prev) => ({
+        ...prev,
+        isPaused: false,
+      }))
+    } catch (err) {
+      setError(`Failed to resume recording: ${err}`)
+      console.error("Resume recording error:", err)
+    }
+  }
+
+  const handleStopRecording = async () => {
+    try {
+      setError(null)
+      await invoke("stop_recording", { sessionId: recordingState.sessionId })
+      setRecordingState({
+        isRecording: false,
+        isPaused: false,
+        duration: 0,
+        sessionId: null,
+      })
+    } catch (err) {
+      setError(`Failed to stop recording: ${err}`)
+      console.error("Stop recording error:", err)
+    }
+  }
+
+  const getRecordingStatus = () => {
+    if (!recordingState.isRecording) return "Ready to Record"
+    if (recordingState.isPaused) return "Recording Paused"
+    return "Recording Active"
+  }
+
+  const getStatusColor = () => {
+    if (!recordingState.isRecording) return "text-gray-600"
+    if (recordingState.isPaused) return "text-yellow-600"
+    return "text-red-600"
   }
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
+    <div className="app">
+      <div className="container">
+        <header className="header">
+          <h1>Productivity Recorder</h1>
+          <p>Self-accountability through screen and webcam recording</p>
+        </header>
 
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+        <div className="recording-panel">
+          <div className="status-section">
+            <div className={`status-indicator ${getStatusColor()}`}>
+              <div
+                className={`status-dot ${recordingState.isRecording && !recordingState.isPaused ? "recording" : ""}`}
+              ></div>
+              <span className="status-text">{getRecordingStatus()}</span>
+            </div>
+
+            <div className="duration-display">
+              <span className="duration-label">Duration:</span>
+              <span className="duration-time">{formatDuration(recordingState.duration)}</span>
+            </div>
+
+            {recordingState.sessionId && (
+              <div className="session-info">
+                <span className="session-label">Session ID:</span>
+                <span className="session-id">{recordingState.sessionId.slice(0, 8)}...</span>
+              </div>
+            )}
+          </div>
+
+          <div className="controls-section">
+            {!recordingState.isRecording ? (
+              <button className="control-btn start-btn" onClick={handleStartRecording}>
+                <span className="btn-icon">●</span>
+                Start Recording
+              </button>
+            ) : (
+              <div className="recording-controls">
+                {recordingState.isPaused ? (
+                  <button className="control-btn resume-btn" onClick={handleResumeRecording}>
+                    <span className="btn-icon">▶</span>
+                    Resume
+                  </button>
+                ) : (
+                  <button className="control-btn pause-btn" onClick={handlePauseRecording}>
+                    <span className="btn-icon">⏸</span>
+                    Pause
+                  </button>
+                )}
+
+                <button className="control-btn stop-btn" onClick={handleStopRecording}>
+                  <span className="btn-icon">⏹</span>
+                  Stop Recording
+                </button>
+              </div>
+            )}
+          </div>
+
+          {error && (
+            <div className="error-message">
+              <span className="error-icon">⚠</span>
+              {error}
+            </div>
+          )}
+        </div>
+
+        <div className="info-panel">
+          <h3>Recording Information</h3>
+          <ul>
+            <li>• Records all monitors simultaneously</li>
+            <li>• Captures webcam footage</li>
+            <li>• Combines all sources into single video file</li>
+            <li>• Session data saved locally for compliance review</li>
+          </ul>
+        </div>
       </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
-  );
+    </div>
+  )
 }
 
-export default App;
+export default App
