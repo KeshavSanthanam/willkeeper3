@@ -1,35 +1,28 @@
 {
-  "$schema": "https://schema.tauri.app/config/2",
-  "productName": "willkeeper3",
+  "productName": "Willkeeper",
   "version": "0.1.0",
-  "identifier": "com.kesha.willkeeper3",
+  "identifier": "com.yourorg.willkeeper",
+
   "build": {
-    "beforeDevCommand": "pnpm dev",
+    "beforeDevCommand": "npm run dev:ui",
+    "beforeBuildCommand": "npm run build:ui",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "pnpm build",
-    "frontendDist": "../dist"
+    "frontendDist": "../out"
   },
+
   "app": {
+    "withGlobalTauri": true,
+    "security": { "csp": null, "capabilities": [] },
     "windows": [
       {
-        "title": "willkeeper3",
-        "width": 800,
-        "height": 600
+        "title": "Willkeeper",
+        "width": 1200,
+        "height": 800,
+        "resizable": true
       }
-    ],
-    "security": {
-      "csp": null
-    }
-  },
-  "bundle": {
-    "active": true,
-    "targets": "all",
-    "icon": [
-      "icons/32x32.png",
-      "icons/128x128.png",
-      "icons/128x128@2x.png",
-      "icons/icon.icns",
-      "icons/icon.ico"
     ]
-  }
+  },
+
+  "bundle": {},
+  "plugins": {}
 }
